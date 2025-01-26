@@ -1,5 +1,4 @@
 streamlit
 plotly
 pandas
-numpy
-mixtend
+mlxtend==0.21.0
