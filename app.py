@@ -4,9 +4,8 @@ from mlxtend.frequent_patterns import apriori, association_rules
 
 # Step 1: Load the dataset
 @st.cache_data
-def load_data(file_path):
-    # Load transaction data (replace with your file path or URL)
-    df = pd.read_csv(file_path)
+def load_data():
+    df = pd.read_csv('transaction.csv')
     df.columns = df.columns.str.strip()  # Clean up column names
     return df
 
