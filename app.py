@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 @st.cache
 def load_data():
     # Replace with your transactional dataset
-    data = pd.read_csv("transactions.csv")  # Update with your dataset file
+    data = pd.read_csv("transaction.csv")  # Update with your dataset file
     return data
 
 # Function to preprocess data for MBA
