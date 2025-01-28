@@ -55,7 +55,9 @@ def recommend_offer(product, days_left, rules, basket, threshold=0.10):
     
     for _, row in product_rules.iterrows():
         consequent = list(row['consequents'])[0]
-        count_transactions_with_product = len(basket[basket[product] == 1][consequent == 1])
+        
+        # Filter basket where the product is bought and the consequent is bought
+        count_transactions_with_product = len(basket[(basket[product] == 1) & (basket[consequent] == 1)])
         transaction_percentage = count_transactions_with_product / total_transactions
         
         product_percentages[consequent] = transaction_percentage
@@ -83,7 +85,6 @@ def recommend_offer(product, days_left, rules, basket, threshold=0.10):
         offer_message[recommended_product] = offer_text
     
     return offer_message
-
 # Step 7: Main Streamlit app
 def main():
     st.title("Product Recommendation Dashboard")
