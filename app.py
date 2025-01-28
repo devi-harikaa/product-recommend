@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 from mlxtend.frequent_patterns import apriori, association_rules
+from datetime import datetime
 
 # Step 1: Load the dataset
 @st.cache_data
@@ -41,14 +42,47 @@ def recommend_product(input_product, rules):
         return recommended_products[0] if recommended_products else "No recommendations found."
     return "No recommendations found."
 
-# Step 6: Recommend Offers
-def recommend_offer(product):
-    offers = {
-        "Milk": "Buy 1 Get 1 Free",
-        "Apple": "10% off on your next purchase",
-        "Bread": "Free delivery on orders over $20",
-    }
-    return offers.get(product, "No special offer available")
+# Step 6: Recommend Offers Based on Transaction Percentage and Days Left
+def recommend_offer(product, days_left, rules, basket, threshold=0.10):
+    # Calculate the percentage of transactions where this product is paired with other products
+    total_transactions = len(basket)
+    
+    # Filter rules where product is in the antecedents
+    product_rules = rules[rules['antecedents'].apply(lambda x: product in x)]
+    
+    # Create a dictionary to store transaction percentages for each product
+    product_percentages = {}
+    
+    for _, row in product_rules.iterrows():
+        consequent = list(row['consequents'])[0]
+        count_transactions_with_product = len(basket[basket[product] == 1][consequent == 1])
+        transaction_percentage = count_transactions_with_product / total_transactions
+        
+        product_percentages[consequent] = transaction_percentage
+
+    # Generate offers based on transaction percentage and expiration days
+    offer_message = {}
+    
+    for recommended_product, percentage in product_percentages.items():
+        offer_text = ""
+        
+        # Apply offer based on transaction percentage
+        if percentage >= threshold:
+            offer_text += f"Buy {product} and get {recommended_product} at 10% off! "
+        else:
+            offer_text += f"Get a special offer on {recommended_product} when you buy {product}! "
+
+        # Apply offer based on days left (urgency-based offer)
+        if days_left <= 7:
+            offer_text += "Hurry, this offer expires soon!"
+        elif days_left <= 30:
+            offer_text += "Limited time offer! Hurry before it's gone!"
+        else:
+            offer_text += "Enjoy this offer with no rush."
+
+        offer_message[recommended_product] = offer_text
+    
+    return offer_message
 
 # Step 7: Main Streamlit app
 def main():
@@ -70,13 +104,17 @@ def main():
 
     # Product selection
     input_product = st.selectbox("Select a product:", basket.columns)
-    if input_product:
+    days_left = st.number_input("Enter the number of days left until expiration:", min_value=0, max_value=365)
+    
+    if input_product and days_left is not None:
         recommended_product = recommend_product(input_product, rules)
         st.write(f"Recommended product to sell with {input_product}: {recommended_product}")
 
-        # Offer recommendation
-        offer = recommend_offer(recommended_product)
-        st.write(f"Special offer: {offer}")
+        # Generate offers based on transaction percentage and expiration days
+        offer = recommend_offer(input_product, days_left, rules, basket)
+        for product, offer_message in offer.items():
+            st.write(f"Special offer for {product}: {offer_message}")
 
 if __name__ == "__main__":
     main()
+
