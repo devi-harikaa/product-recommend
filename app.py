@@ -2,37 +2,25 @@ import pandas as pd
 import streamlit as st
 from mlxtend.frequent_patterns import apriori, association_rules
 
-# Load and preprocess transaction data
+# Load and preprocess the data
 @st.cache_data
-def load_transactions():
+def load_data():
     try:
         df = pd.read_csv('transaction.csv')
         df.columns = df.columns.str.strip()
         return df
     except FileNotFoundError:
-        st.error("Transaction dataset not found. Please upload 'transaction.csv'.")
+        st.error("Dataset file not found. Please upload 'transaction.csv'.")
         return None
 
-# Load price and stock data
-@st.cache_data
-def load_price_stock():
-    try:
-        df = pd.read_csv('transaction.csv')
-        df.columns = df.columns.str.strip()
-        return df
-    except FileNotFoundError:
-        st.error("Stock dataset not found. Please upload 'price_stock.csv'.")
-        return None
-
-# Convert transaction data to basket format
+# Convert transactions into a one-hot encoded basket format
 @st.cache_data
 def preprocess_data(df):
     basket = df.groupby(['InvoiceNo', 'Product'])['Quantity'].sum().unstack().fillna(0)
     basket = basket.applymap(lambda x: 1 if x > 0 else 0)
     return basket
 
-# Generate frequent itemsets
-@st.cache_data
+# Apply the Apriori algorithm
 def get_frequent_itemsets(basket, min_support=0.05):
     return apriori(basket, min_support=min_support, use_colnames=True)
 
@@ -40,83 +28,57 @@ def get_frequent_itemsets(basket, min_support=0.05):
 def get_association_rules(frequent_itemsets, min_lift=1.0):
     return association_rules(frequent_itemsets, metric="lift", min_threshold=min_lift)
 
-# Recommend products based on rules
+# Recommend products frequently bought together
 def recommend_product(product, rules):
-    product_rules = rules[rules['antecedents'].apply(lambda x: product in x)]
-    return product_rules['consequents'].apply(lambda x: list(x)[0]).tolist() if not product_rules.empty else None
+    filtered_rules = rules[rules['antecedents'].apply(lambda x: product in x)]
+    recommended = filtered_rules['consequents'].apply(lambda x: list(x)[0]).tolist()
+    return recommended[:3] if recommended else ["No strong recommendations"]
 
-# Recommend offers based on stock availability and demand
-def recommend_offer(product, days_left, rules, basket, stock_df):
-    total_transactions = len(basket)
-    product_rules = rules[rules['antecedents'].apply(lambda x: product in x)]
-    offers = []
+# Generate offers based on stock levels and transactions
+def recommend_offer(product, df, rules):
+    stock_data = df[df['Product'] == product].iloc[-1]
+    stock_left = stock_data['StockLeft']
+    total_stock = stock_data['StockOn']
 
-    for _, row in product_rules.iterrows():
-        consequent = list(row['consequents'])[0]
-        transactions_with_product = len(basket[(basket[product] == 1) & (basket[consequent] == 1)])
-        transaction_percentage = transactions_with_product / total_transactions
+    recommended_products = recommend_product(product, rules)
+    offer_messages = {}
 
-        stock_info = stock_df[stock_df['Product'] == consequent]
-        if stock_info.empty:
+    for rec_product in recommended_products:
+        if rec_product == "No strong recommendations":
             continue
 
-        stock_left = int(stock_info['StockLeft'].values[0])
-        price = float(stock_info['Price'].values[0])
-        
-        discount = 0
-        if stock_left < 10:
-            discount = 25
-        elif days_left <= 7:
-            discount = 20
-        elif days_left <= 30:
-            discount = 15
-        elif transaction_percentage >= 0.10:
-            discount = 10
-        else:
-            discount = 5
+        discount = 10 if stock_left / total_stock < 0.3 else 5
+        urgency = "Limited time offer!" if stock_left < 5 else "Available now!"
 
-        offers.append({
-            "Product": consequent,
-            "Discount": f"{discount}%",
-            "Final Price": f"${price * (1 - discount / 100):.2f}"
-        })
+        offer_messages[rec_product] = f"Buy {product} and get {rec_product} at {discount}% off! {urgency}"
 
-    return offers
+    return offer_messages
 
-# Streamlit App
+# Streamlit UI
 def main():
-    st.title("Product Recommendation & Offer Generator")
-    df = load_transactions()
-    stock_df = load_price_stock()
-    
-    if df is None or stock_df is None:
+    st.title("Product Recommendation & Offers")
+
+    df = load_data()
+    if df is None:
         st.stop()
-    
+
     basket = preprocess_data(df)
     frequent_itemsets = get_frequent_itemsets(basket)
     rules = get_association_rules(frequent_itemsets)
-    
+
     if rules.empty:
-        st.warning("No strong association rules found. Try adjusting the support/lift values.")
+        st.error("No recommendations found. Try adjusting the parameters.")
         st.stop()
-    
-    input_product = st.selectbox("Select a product:", basket.columns)
-    days_left = st.slider("Days left until expiration:", 0, 365, 30)
-    
-    if input_product:
-        recommendations = recommend_product(input_product, rules)
-        if recommendations:
-            st.subheader(f"Recommended Products to Sell with {input_product}:")
-            st.write(", ".join(recommendations))
-        else:
-            st.write("No strong product recommendations found.")
-        
-        offers = recommend_offer(input_product, days_left, rules, basket, stock_df)
+
+    product = st.selectbox("Select a product:", basket.columns)
+
+    if product:
+        offers = recommend_offer(product, df, rules)
         if offers:
-            st.subheader("Special Offers:")
-            st.table(offers)
+            for rec_product, offer_text in offers.items():
+                st.write(f"📢 **{rec_product}**: {offer_text}")
         else:
-            st.write("No available offers based on current data.")
+            st.write("No offers available.")
 
 if __name__ == "__main__":
     main()
