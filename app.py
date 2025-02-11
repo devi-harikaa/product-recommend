@@ -76,7 +76,7 @@ def recommend_offer(product, df, rules):
 
 # Streamlit UI
 def main():
-    st.title("🛒 Product Recommendations & Offers")
+    st.title("Product Recommendations & Offers")
 
     df = load_data()
     if df is None:
@@ -96,13 +96,13 @@ def main():
         offers = recommend_offer(product, df, rules)
 
         if offers:
-            st.markdown(f"### 📌 Product: **{product}**")
+            st.markdown(f"### Product: {product}")
             for offer in offers:
                 st.markdown(f"""
-  - **Recommended Product:** {offer['Product']}
-    - 💰 **Original Price:** ${offer['Original Price']}
-    - 🔥 **Discount:** {offer['Discount']}
-    - 🏷️ **Discounted Price:** ${offer['Discounted Price']}
+  - Recommended Product: {offer['Product']}
+    - Original Price: ${offer['Original Price']}
+    - Discount: {offer['Discount']}
+    - Discounted Price: ${offer['Discounted Price']}
                 """)
         else:
             st.write("No offers available.")
