@@ -17,7 +17,7 @@ def load_transactions():
 @st.cache_data
 def load_price_stock():
     try:
-        df = pd.read_csv('price_stock.csv')
+        df = pd.read_csv('transaction.csv')
         df.columns = df.columns.str.strip()
         return df
     except FileNotFoundError:
