@@ -35,13 +35,20 @@ def recommend_product(product, rules):
     recommended = filtered_rules['consequents'].apply(lambda x: list(x)[0]).tolist()
     return recommended[:3] if recommended else ["No strong recommendations"]
 
-# Calculate selling percentage
-def calculate_selling_percentage(df, product):
-    product_data = df[df['Product'] == product]
-    total_stock = product_data.iloc[-1]['StockOn']
-    sold = total_stock - product_data.iloc[-1]['StockLeft']
-    selling_percentage = round((sold / total_stock) * 100, 2) if total_stock > 0 else 0
-    return selling_percentage
+# Calculate dynamic discount based on stock levels
+def calculate_discount(stock_on, stock_left):
+    stock_sold = stock_on - stock_left
+    stock_ratio = stock_sold / stock_on if stock_on > 0 else 0
+
+    # Define discount tiers based on stock movement
+    if stock_ratio > 0.8:
+        return 5  # Small discount for high-selling products
+    elif 0.5 <= stock_ratio <= 0.8:
+        return 10  # Moderate discount for steady-selling products
+    elif 0.2 <= stock_ratio < 0.5:
+        return 15  # Higher discount for slow-moving products
+    else:
+        return 20  # Maximum discount for stagnant stock
 
 # Generate offers based on stock levels and transactions
 def recommend_offer(product, df, rules):
@@ -59,18 +66,20 @@ def recommend_offer(product, df, rules):
 
         rec_data = df[df['Product'] == rec_product].iloc[-1]
         rec_price = rec_data['Price']
+        rec_stock_on = rec_data['StockOn']
+        rec_stock_left = rec_data['StockLeft']
 
-        discount = 15 if stock_left / total_stock < 0.2 else 10
-        offer_days_left = max(3, min(10, stock_left // 5))  # Dynamically set offer expiry
+        # Calculate dynamic discount
+        discount = calculate_discount(rec_stock_on, rec_stock_left)
 
-        selling_percentage = calculate_selling_percentage(df, rec_product)
+        # Dynamically set offer expiry (between 3-10 days)
+        offer_days_left = max(3, min(10, rec_stock_left // 5))
 
         offer_messages[rec_product] = {
             "discount": discount,
             "original_price": rec_price,
             "discounted_price": round(rec_price * (1 - discount / 100), 2),
-            "days_left": offer_days_left,
-            "selling_percentage": selling_percentage
+            "days_left": offer_days_left
         }
 
     return offer_messages
@@ -103,7 +112,6 @@ def main():
                 - 🔥 Discount: **{offer_details['discount']}%**
                 - 🏷️ New Price: **${offer_details['discounted_price']}**
                 - ⏳ Offer Expires in: **{offer_details['days_left']} days**
-                - 📊 Selling Rate: **{offer_details['selling_percentage']}% sold**
                 """)
         else:
             st.write("No offers available.")
