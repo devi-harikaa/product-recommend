@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 from mlxtend.frequent_patterns import apriori, association_rules
-import datetime
+import random
 
 # Load and preprocess the data
 @st.cache_data
@@ -35,26 +35,18 @@ def recommend_product(product, rules):
     recommended = filtered_rules['consequents'].apply(lambda x: list(x)[0]).tolist()
     return recommended[:3] if recommended else ["No strong recommendations"]
 
-# Calculate dynamic discount based on stock levels
-def calculate_discount(stock_on, stock_left):
-    stock_sold = stock_on - stock_left
-    stock_ratio = stock_sold / stock_on if stock_on > 0 else 0
-
-    # Define discount tiers based on stock movement
-    if stock_ratio > 0.8:
-        return 5  # Small discount for high-selling products
-    elif 0.5 <= stock_ratio <= 0.8:
-        return 10  # Moderate discount for steady-selling products
-    elif 0.2 <= stock_ratio < 0.5:
-        return 15  # Higher discount for slow-moving products
+# Calculate discount based on days left
+def calculate_discount(days_left):
+    if days_left > 7:
+        return 5  # Low discount for long-duration offers
+    elif 4 <= days_left <= 7:
+        return 10  # Moderate discount
     else:
-        return 20  # Maximum discount for stagnant stock
+        return 20  # High discount for urgent sales
 
 # Generate offers based on stock levels and transactions
 def recommend_offer(product, df, rules):
     stock_data = df[df['Product'] == product].iloc[-1]
-    stock_left = stock_data['StockLeft']
-    total_stock = stock_data['StockOn']
     product_price = stock_data['Price']
 
     recommended_products = recommend_product(product, rules)
@@ -66,14 +58,12 @@ def recommend_offer(product, df, rules):
 
         rec_data = df[df['Product'] == rec_product].iloc[-1]
         rec_price = rec_data['Price']
-        rec_stock_on = rec_data['StockOn']
-        rec_stock_left = rec_data['StockLeft']
-
-        # Calculate dynamic discount
-        discount = calculate_discount(rec_stock_on, rec_stock_left)
 
         # Dynamically set offer expiry (between 3-10 days)
-        offer_days_left = max(3, min(10, rec_stock_left // 5))
+        offer_days_left = random.randint(3, 10)
+
+        # Calculate discount based on days left
+        discount = calculate_discount(offer_days_left)
 
         offer_messages[rec_product] = {
             "discount": discount,
