@@ -38,11 +38,11 @@ def recommend_product(product, rules):
 # Calculate discount based on days left
 def calculate_discount(days_left):
     if days_left > 7:
-        return 5  # Low discount for long-duration offers
+        return 5  # Low discount
     elif 4 <= days_left <= 7:
         return 10  # Moderate discount
     else:
-        return 20  # High discount for urgent sales
+        return 20  # High discount
 
 # Generate offers based on stock levels and transactions
 def recommend_offer(product, df, rules):
@@ -50,7 +50,7 @@ def recommend_offer(product, df, rules):
     product_price = stock_data['Price']
 
     recommended_products = recommend_product(product, rules)
-    offer_messages = {}
+    offer_list = []
 
     for rec_product in recommended_products:
         if rec_product == "No strong recommendations":
@@ -65,18 +65,18 @@ def recommend_offer(product, df, rules):
         # Calculate discount based on days left
         discount = calculate_discount(offer_days_left)
 
-        offer_messages[rec_product] = {
-            "discount": discount,
-            "original_price": rec_price,
-            "discounted_price": round(rec_price * (1 - discount / 100), 2),
-            "days_left": offer_days_left
-        }
+        offer_list.append({
+            "Product": rec_product,
+            "Original Price": rec_price,
+            "Discount": f"{discount}%",
+            "Discounted Price": round(rec_price * (1 - discount / 100), 2)
+        })
 
-    return offer_messages
+    return offer_list
 
 # Streamlit UI
 def main():
-    st.title("🛒 Product Recommendation & Offers")
+    st.title("🛒 Product Recommendations & Offers")
 
     df = load_data()
     if df is None:
@@ -94,14 +94,15 @@ def main():
 
     if product:
         offers = recommend_offer(product, df, rules)
+
         if offers:
-            for rec_product, offer_details in offers.items():
+            st.markdown(f"### 📌 Product: **{product}**")
+            for offer in offers:
                 st.markdown(f"""
-                **📢 {rec_product} Offer:**
-                - 💰 Original Price: **${offer_details['original_price']}**
-                - 🔥 Discount: **{offer_details['discount']}%**
-                - 🏷️ New Price: **${offer_details['discounted_price']}**
-                - ⏳ Offer Expires in: **{offer_details['days_left']} days**
+  - **Recommended Product:** {offer['Product']}
+    - 💰 **Original Price:** ${offer['Original Price']}
+    - 🔥 **Discount:** {offer['Discount']}
+    - 🏷️ **Discounted Price:** ${offer['Discounted Price']}
                 """)
         else:
             st.write("No offers available.")
